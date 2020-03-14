@@ -1,0 +1,74 @@
+#!/bin/sh
+
+uci set luci.main.lang=zh_cn
+uci commit luci
+
+uci set system.@system[0].hostname=HIRouter
+uci set system.@system[0].timezone=CST-8
+uci set system.@system[0].zonename=Asia/Shanghai
+uci commit system
+
+uci set fstab.@global[0].anon_mount=1
+uci commit fstab
+
+rm -f /usr/lib/lua/luci/view/admin_status/index/mwan.htm
+rm -f /usr/lib/lua/luci/view/admin_status/index/upnp.htm
+rm -f /usr/lib/lua/luci/view/admin_status/index/ddns.htm
+rm -f /usr/lib/lua/luci/view/admin_status/index/minidlna.htm
+
+sed -i 's/\"services\"/\"nas\"/g' /usr/lib/lua/luci/controller/aria2.lua
+sed -i 's/services/nas/g' /usr/lib/lua/luci/view/aria2/overview_status.htm
+sed -i 's/\"services\"/\"nas\"/g' /usr/lib/lua/luci/controller/hd_idle.lua
+sed -i 's/\"services\"/\"nas\"/g' /usr/lib/lua/luci/controller/samba.lua
+sed -i 's/\"services\"/\"nas\"/g' /usr/lib/lua/luci/controller/minidlna.lua
+sed -i 's/\"services\"/\"nas\"/g' /usr/lib/lua/luci/controller/transmission.lua
+sed -i 's/\"services\"/\"nas\"/g' /usr/lib/lua/luci/controller/mjpg-streamer.lua
+sed -i 's/\"services\"/\"nas\"/g' /usr/lib/lua/luci/controller/p910nd.lua
+sed -i 's/\"services\"/\"nas\"/g' /usr/lib/lua/luci/controller/usb_printer.lua
+sed -i 's/\"services\"/\"nas\"/g' /usr/lib/lua/luci/controller/xunlei.lua
+
+sed -i 's/services/nas/g'  /usr/lib/lua/luci/view/minidlna_status.htm
+
+ln -sf /sbin/ip /usr/bin/ip
+
+sed -i '/REDIRECT --to-ports 53/d' /etc/firewall.user
+echo "iptables -t nat -A PREROUTING -p udp --dport 53 -j REDIRECT --to-ports 53" >> /etc/firewall.user
+echo "iptables -t nat -A PREROUTING -p tcp --dport 53 -j REDIRECT --to-ports 53" >> /etc/firewall.user
+
+sed -i '/option disabled/d' /etc/config/wireless
+sed -i '/set wireless.radio${devidx}.disabled/d' /lib/wifi/mac80211.sh
+
+# My Add to
+sed -i '/DISTRIB_REVISION/d' /etc/openwrt_release
+echo "DISTRIB_REVISION='higirl'" >> /etc/openwrt_release
+sed -i '/DISTRIB_DESCRIPTION/d' /etc/openwrt_release
+echo "DISTRIB_DESCRIPTION='OpenWrt 19.07 by '" >> /etc/openwrt_release
+# 修改连接
+sed -i '/net.netfilter.nf_conntrack_max/d' /etc/sysctl.conf
+echo "net.netfilter.nf_conntrack_max=100000" >> /etc/sysctl.conf
+
+#sed -i '705a\<tr\>\<td width="33%"\>\<%:CPU状态%\>\<\/td\>\<td \>Use: \<%=luci.sys.exec("echo -e `expr 100 - $(top -n 1 | grep '\''CPU:'\'' | awk -F '\''%'\'' '\''{ print $4 }'\'' | awk -F '\'' '\'' '\''{ print $2 }'\'')'\`'") %\>%  |  \<%=luci.sys.exec("grep '\''MHz'\'' /proc/cpuinfo | cut -c11- |sed -n '\''1p'\''")%\> MHz  |  Temp:     \<%=luci.sys.exec("sensors | grep '\''Core 0'\'' | cut -c10-24")%\>\ </td\>\</tr\>' /usr/lib/lua/luci/view/admin_status/index.htm
+#sed -i '705d' /usr/lib/lua/luci/view/admin_status/index.htm
+# 自建软件源
+#sed -i '/option check_signature 1/d' /etc/opkg.conf
+#echo "#option check_signature 1'" >> /etc/opkg.conf
+# rm -f /etc/opkg/distfeeds.conf
+# echo "src/gz hirouter http://higirl.tw/packages/x86_64" >> /etc/opkg/distfeeds.conf
+
+sed -i '/log-facility/d' /etc/dnsmasq.conf
+echo "log-facility=/dev/null" >> /etc/dnsmasq.conf
+
+sed -i 's/cbi.submit\"] = true/cbi.submit\"] = \"1\"/g' /usr/lib/lua/luci/dispatcher.lua
+
+echo 'hsts=0' > /root/.wgetrc
+
+rm -rf /tmp/luci-modulecache/
+rm -f /tmp/luci-indexcache
+mkdir /var/etc/aria2
+uci set network.lan.ipaddr='192.168.56.2'
+uci commit
+
+exit 0
+
+
+
