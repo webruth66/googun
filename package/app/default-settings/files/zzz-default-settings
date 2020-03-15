@@ -47,8 +47,8 @@ echo "DISTRIB_DESCRIPTION='OpenWrt 19.07 by '" >> /etc/openwrt_release
 sed -i '/net.netfilter.nf_conntrack_max/d' /etc/sysctl.conf
 echo "net.netfilter.nf_conntrack_max=100000" >> /etc/sysctl.conf
 # Show Cpu&Temperature
-#sed -i '705a\<tr\>\<td width="33%"\>\<%:CPU状态%\>\<\/td\>\<td \>Use: \<%=luci.sys.exec("echo -e `expr 100 - $(top -n 1 | grep '\''CPU:'\'' | awk -F '\''%'\'' '\''{ print $4 }'\'' | awk -F '\'' '\'' '\''{ print $2 }'\'')'\`'") %\>%  |  \<%=luci.sys.exec("grep '\''MHz'\'' /proc/cpuinfo | cut -c11- |sed -n '\''1p'\''")%\> MHz  |  Temp:     \<%=luci.sys.exec("sensors | grep '\''Core 0'\'' | cut -c10-24")%\>\ </td\>\</tr\>' /usr/lib/lua/luci/view/admin_status/index.htm
-#sed -i '705d' /usr/lib/lua/luci/view/admin_status/index.htm
+sed -i '705a\<tr\>\<td width="33%"\>\<%:CPU状态%\>\<\/td\>\<td \>Use: \<%=luci.sys.exec("echo -e `expr 100 - $(top -n 1 | grep '\''CPU:'\'' | awk -F '\''%'\'' '\''{ print $4 }'\'' | awk -F '\'' '\'' '\''{ print $2 }'\'')'\`'") %\>%  |  \<%=luci.sys.exec("grep '\''MHz'\'' /proc/cpuinfo | cut -c11- |sed -n '\''1p'\''")%\> MHz  |  Temp:     \<%=luci.sys.exec("sensors | grep '\''Core 0'\'' | cut -c10-24")%\>\ </td\>\</tr\>' /usr/lib/lua/luci/view/admin_status/index.htm
+sed -i '705d' /usr/lib/lua/luci/view/admin_status/index.htm
 # Self-Software
 #sed -i '/option check_signature 1/d' /etc/opkg.conf
 #echo "#option check_signature 1'" >> /etc/opkg.conf
