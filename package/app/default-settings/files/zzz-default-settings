@@ -52,8 +52,8 @@ echo "net.netfilter.nf_conntrack_max=100000" >> /etc/sysctl.conf
 # Self-Software
 #sed -i '/option check_signature 1/d' /etc/opkg.conf
 #echo "#option check_signature 1'" >> /etc/opkg.conf
-# rm -f /etc/opkg/distfeeds.conf
-# echo "src/gz hirouter http://higirl.tw/packages/x86_64" >> /etc/opkg/distfeeds.conf
+#rm -f /etc/opkg/distfeeds.conf
+#echo "src/gz hirouter http://higirl.tw/packages/x86_64" >> /etc/opkg/distfeeds.conf
 
 sed -i '/log-facility/d' /etc/dnsmasq.conf
 echo "log-facility=/dev/null" >> /etc/dnsmasq.conf
