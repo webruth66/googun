@@ -105,31 +105,24 @@ fake_block() {
 
 yml_check()
 {
-   #替换tab
+   #格式替换
    sed -i 's/\t/ /g' "$3" 2>/dev/null
-   
+   sed -i "s/- \{2,\}/- /g" "$3" 2>/dev/null
+
    #检查关键字避免后续操作出错
    #proxies
    [ -z "$(grep "^Proxy:" "$3")" ] && {
-      sed -i "/^ \{0,\}\'Proxy\':/c\Proxy:" "$3" 2>/dev/null
-      sed -i '/^ \{0,\}\"Proxy\":/c\Proxy:' "$3" 2>/dev/null
       sed -i "/^ \{1,\}Proxy:/c\Proxy:" "$3" 2>/dev/null
    }
    [ -z "$(grep "^Proxy:" "$3")" ] && {
-      sed -i "s/^\'proxies\':/Proxy:/" "$3" 2>/dev/null
-      sed -i 's/^\"proxies\":/Proxy:/' "$3" 2>/dev/null
       sed -i "s/^proxies:/Proxy:/" "$3" 2>/dev/null
    }
 
 	 #proxy-providers
 	 [ -z "$(grep "^proxy-provider:" "$3")" ] && {
-      sed -i "/^ \{0,\}\'proxy-provider\':/c\proxy-provider:" "$3" 2>/dev/null
-      sed -i '/^ \{0,\}\"proxy-provider\":/c\proxy-provider:' "$3" 2>/dev/null
       sed -i "/^ \{1,\}proxy-provider:/c\proxy-provider:" "$3" 2>/dev/null
    }
    [ -z "$(grep "^proxy-provider:" "$3")" ] && {
-      sed -i "/^ \{0,\}\'proxy-providers\':/c\proxy-provider:" "$3" 2>/dev/null
-      sed -i '/^ \{0,\}\"proxy-providers\":/c\proxy-provider:' "$3" 2>/dev/null
       sed -i "/^ \{0,\}proxy-providers:/c\proxy-provider:" "$3" 2>/dev/null
    }
    #proxy-groups
@@ -139,27 +132,19 @@ yml_check()
       sed -i "/^ \{1,\}Proxy Group:/c\Proxy Group:" "$3" 2>/dev/null
    }
    [ -z "$(grep "^Proxy Group:" "$3")" ] && {
-      sed -i "/^ \{0,\}\'proxy-groups\':/c\Proxy Group:" "$3" 2>/dev/null
-      sed -i '/^ \{0,\}\"proxy-groups\":/c\Proxy Group:' "$3" 2>/dev/null
       sed -i "/^ \{0,\}proxy-groups:/c\Proxy Group:" "$3" 2>/dev/null
    }
    
    #rules
    [ -z "$(grep "^Rule:" "$3")" ] && {
-      sed -i "/^ \{0,\}\'Rule\':/c\Rule:" "$3" 2>/dev/null
-      sed -i '/^ \{0,\}\"Rule\":/c\Rule:' "$3" 2>/dev/null
       sed -i "/^ \{1,\}Rule:/c\Rule:" "$3" 2>/dev/null
    }
    [ -z "$(grep "^Rule:" "$3")" ] && {
-      sed -i "/^ \{0,\}\'rules\':/c\Rule:" "$3" 2>/dev/null
-      sed -i '/^ \{0,\}\"rules\":/c\Rule:' "$3" 2>/dev/null
       sed -i "/^ \{0,\}rules:/c\Rule:" "$3" 2>/dev/null
    }
    
    #dns
    [ -z "$(grep "^dns:" "$3")" ] && {
-      sed -i "/^ \{0,\}\'dns\':/c\dns:" "$3" 2>/dev/null
-      sed -i '/^ \{0,\}\"dns\":/c\dns:' "$3" 2>/dev/null
       sed -i "/^ \{1,\}dns:/c\dns:" "$3" 2>/dev/null
    }
 	 
@@ -290,9 +275,17 @@ yml_dns_check()
    fi
   
    if [ ! -z "$(grep "^ \{0,\}listen:" "$CONFIG_FILE")" ]; then
-      sed -i "/^ \{0,\}listen:/c\  listen: 0.0.0.0:${dns_port}" "$CONFIG_FILE" 2>/dev/null
+      if [ "$ipv6_enable" -ne 1 ]; then
+         sed -i "/^ \{0,\}listen:/c\  listen: 127.0.0.1:${dns_port}" "$CONFIG_FILE" 2>/dev/null
+      else
+         sed -i "/^ \{0,\}listen:/c\  listen: 0.0.0.0:${dns_port}" "$CONFIG_FILE" 2>/dev/null
+      fi
    else
-      sed -i "/^dns:/a\  listen: 0.0.0.0:${dns_port}" "$CONFIG_FILE" 2>/dev/null
+      if [ "$ipv6_enable" -ne 1 ]; then
+         sed -i "/^dns:/a\  listen: 127.0.0.1:${dns_port}" "$CONFIG_FILE" 2>/dev/null
+      else
+         sed -i "/^dns:/a\  listen: 0.0.0.0:${dns_port}" "$CONFIG_FILE" 2>/dev/null
+      fi
    fi
    
    uci set openclash.config.dns_port="$dns_port" && uci commit openclash
@@ -644,12 +637,9 @@ lan_ac()
   
 }
 
-start()
+#配置文件选择
+config_choose()
 {
-#禁止多个实例
-status=$(ps|grep -c /etc/init.d/openclash)
-[ "$status" -gt "3" ] && exit 0
-
 if [ -z "$CONFIG_FILE" ] || [ ! -f "$CONFIG_FILE" ]; then
    CONFIG_NAME=$(ls -lt /etc/openclash/config/ | grep -E '.yaml|.yml' | head -n 1 |awk '{print $9}')
    if [ ! -z "$CONFIG_NAME" ]; then
@@ -669,39 +659,81 @@ if [ -z "$CONFIG_FILE" ] || [ ! -f "$CONFIG_FILE" ]; then
    fi
 else
    if [ ! -f "$CONFIG_FILE" ] && [ -f "$BACKUP_FILE" ]; then
-   cp "$BACKUP_FILE" "$CONFIG_FILE"
+      cp "$BACKUP_FILE" "$CONFIG_FILE"
    fi
 fi
 CONFIG_NAME=$(echo "$CONFIG_FILE" |awk -F '/' '{print $5}' 2>/dev/null)
+}
+
+#运行模式处理
+do_run_mode()
+{
+    en_mode=$(uci get openclash.config.en_mode 2>/dev/null)
+    
+    if [ ! -h "/etc/openclash/clash" ] && [ -s "/etc/openclash/clash" ] && [ ! -s "/etc/openclash/core/clash" ]; then
+       mv "/etc/openclash/clash" "/etc/openclash/core/clash" 2>/dev/null
+    fi
+    
+    rm -rf "/etc/openclash/clash" 2>/dev/null
+    
+    if [ "$en_mode" = "fake-ip-tun" ]; then
+       en_mode_tun="1"
+       en_mode="fake-ip"
+       ln -s /etc/openclash/core/clash_tun /etc/openclash/clash 2>/dev/null
+       core_type="Tun"
+    fi
+    
+    if [ "$en_mode" = "redir-host-tun" ]; then
+       en_mode_tun="1"
+       en_mode="redir-host"
+       ln -s /etc/openclash/core/clash_tun /etc/openclash/clash 2>/dev/null
+       core_type="Tun"
+    fi
+    
+    if [ "$en_mode" = "redir-host-vpn" ]; then
+       en_mode_tun="2"
+       en_mode="redir-host"
+       ln -s /etc/openclash/core/clash_game /etc/openclash/clash 2>/dev/null
+       core_type="Game"
+    fi
+    
+    if [ "$en_mode" = "fake-ip-vpn" ]; then
+       en_mode_tun="2"
+       en_mode="fake-ip"
+       ln -s /etc/openclash/core/clash_game /etc/openclash/clash 2>/dev/null
+       core_type="Game"
+    fi
+    
+    if [ ! -f "/etc/openclash/clash" ] && [ -f "/etc/openclash/core/clash" ]; then
+    	ln -s /etc/openclash/core/clash /etc/openclash/clash 2>/dev/null
+    fi
+
+#权限检查
+    [ ! -x "/etc/openclash/core/clash_tun" ] && chmod 4755 /etc/openclash/core/clash_tun 2>/dev/null
+    [ ! -x "/etc/openclash/core/clash_game" ] && chmod 4755 /etc/openclash/core/clash_game 2>/dev/null
+    [ ! -x "/etc/openclash/core/clash" ] && chmod 4755 /etc/openclash/core/clash 2>/dev/null
+}
+
+start()
+{
+#禁止多个实例
+status=$(ps|grep -c /etc/init.d/openclash)
+[ "$status" -gt "3" ] && exit 0
+
+config_choose
 
 enable=$(uci get openclash.config.enable 2>/dev/null)
 LOGTIME=$(date "+%Y-%m-%d %H:%M:%S")
 if [ "$enable" -eq 1 ] && [ -f "$CONFIG_FILE" ]; then
 #检查是否存在核心文件
-[ ! -f "$CLASH" ] && {
-   echo "OpenClash 核心文件不存在，开始下载..." >$START_LOG
-   nohup /usr/share/openclash/openclash_core.sh &
-   exit 0
-}
+   do_run_mode
+   [ ! -f "$CLASH" ] && {
+      echo "内核文件不存在，开始下载..." >$START_LOG
+      nohup /usr/share/openclash/openclash_core.sh "$core_type" &
+      exit 0
+   }
     echo "OpenClash 开始启动..." >$START_LOG
     echo "第一步: 获取配置..." >$START_LOG
-    en_mode=$(uci get openclash.config.en_mode 2>/dev/null)
-    if [ "$en_mode" = "fake-ip-tun" ]; then
-       en_mode_tun="1"
-       en_mode="fake-ip"
-    fi
-    if [ "$en_mode" = "redir-host-tun" ]; then
-       en_mode_tun="1"
-       en_mode="redir-host"
-    fi
-    if [ "$en_mode" = "redir-host-vpn" ]; then
-       en_mode_tun="2"
-       en_mode="redir-host"
-    fi
-    if [ "$en_mode" = "fake-ip-vpn" ]; then
-       en_mode_tun="2"
-       en_mode="fake-ip"
-    fi
     enable_custom_dns=$(uci get openclash.config.enable_custom_dns 2>/dev/null)
     rule_source=$(uci get openclash.config.rule_source 2>/dev/null)
     enable_custom_clash_rules=$(uci get openclash.config.enable_custom_clash_rules 2>/dev/null) 
@@ -756,7 +788,7 @@ if [ "$enable" -eq 1 ] && [ -f "$CONFIG_FILE" ]; then
              sleep 10
              echo "" >$START_LOG
           else
-             echo "第五步: 启动 Clash 主程序..." >$START_LOG
+             echo "第五步: 启动主程序..." >$START_LOG
              nohup "$CLASH" -d "$CLASH_CONFIG" -f "$CONFIG_FILE" >> $LOG_FILE 2>&1 &
              
              #检测proxy_provider配置文件状态
@@ -766,10 +798,10 @@ if [ "$enable" -eq 1 ] && [ -f "$CONFIG_FILE" ]; then
              echo "第七步: 设置控制面板..." >$START_LOG
              ln -s /usr/share/openclash/yacd /www/luci-static/openclash 2>/dev/null
        
-             echo "第八步: 设置 OpenClash 防火墙规则..." >$START_LOG
-             if [ "$(iptables -t nat -nL PREROUTING --line-number |grep "udp dpt:53" |wc -l)" -gt 1 ] && [ "$enable_redirect_dns" -eq "1" ]; then
+             echo "第八步: 设置防火墙规则..." >$START_LOG
+             if [ "$(iptables -t nat -nL PREROUTING --line-number |grep "udp dpt:53" |grep "0.0.0.0/0 \{0,\}0.0.0.0/0" |wc -l)" -gt 1 ] && [ "$enable_redirect_dns" -eq "1" ]; then
                 echo "发现53端口被劫持，清理防火墙规则..." >$START_LOG
-                pre_lines=$(iptables -nvL PREROUTING -t nat |sed 1,2d |sed -n '/udp dpt:53/=' 2>/dev/null |sort -rn)
+                pre_lines=$(iptables -nvL PREROUTING -t nat |sed 1,2d |sed -n '/0.0.0.0\/0 \{0,\}0.0.0.0\/0 \{0,\}udp dpt:53/=' 2>/dev/null |sort -rn)
                 for pre_line in $pre_lines; do
                    iptables -t nat -D PREROUTING "$pre_line" >/dev/null 2>&1
                 done
@@ -789,7 +821,7 @@ if [ "$enable" -eq 1 ] && [ -f "$CONFIG_FILE" ]; then
                 uci set firewall.openclash.reload=1 >/dev/null 2>&1
              fi
           
-             if [ ! -z "$en_mode_tun" ] && [ "$(uci get firewall.@defaults[0].forward)" != "ACCEPT" ]; then
+             if [ "$(uci get firewall.@defaults[0].forward)" != "ACCEPT" ]; then
                 uci set firewall.@defaults[0].forward=ACCEPT >/dev/null 2>&1
                 uci commit firewall >/dev/null 2>&1
                 /etc/init.d/firewall reload >/dev/null 2>&1
@@ -838,8 +870,8 @@ EOF
                 
                 #udp
                 if [ "$enable_udp_proxy" -eq 1 ]; then
-                ip rule add fwmark 1 table 100
-                ip route add local default dev lo table 100
+                ip rule add fwmark "$PROXY_FWMARK" table "$PROXY_ROUTE_TABLE" pref 789
+                ip route add local default dev lo table "$PROXY_ROUTE_TABLE"
                 iptables -t mangle -N openclash
                 iptables -t mangle -A openclash -m set --match-set lan_ac_black_ips src -j RETURN >/dev/null 2>&1
                 iptables -t mangle -A openclash -m set ! --match-set lan_ac_white_ips src -j RETURN >/dev/null 2>&1
@@ -857,14 +889,14 @@ EOF
                    done
                 fi
                 
-                iptables -t mangle -A openclash -p udp -j TPROXY --on-port "$proxy_port" --tproxy-mark 1
+                iptables -t mangle -A openclash -p udp -j TPROXY --on-port "$proxy_port" --tproxy-mark "$PROXY_FWMARK"
                 iptables -t mangle -A PREROUTING -p udp -j openclash
                 fi
                 
                 if [ "$en_mode" = "fake-ip" ]; then
                    iptables -t nat -A OUTPUT -p tcp -d 198.18.0.0/16 -j REDIRECT --to-ports "$proxy_port"
                    if [ "$enable_udp_proxy" -eq 1 ]; then
-                      iptables -t mangle -A OUTPUT -p udp -d 198.18.0.0/16 -j MARK --set-mark 1
+                      iptables -t mangle -A OUTPUT -p udp -d 198.18.0.0/16 -j MARK --set-mark "$PROXY_FWMARK"
                    fi
                 fi
                 
@@ -889,7 +921,7 @@ EOF
                             fi
                          done
                       fi
-                      ip6tables -t mangle -A openclash -p udp -j TPROXY --on-port "$proxy_port" --tproxy-mark 1
+                      ip6tables -t mangle -A openclash -p udp -j TPROXY --on-port "$proxy_port" --tproxy-mark "$PROXY_FWMARK"
                       ip6tables -t mangle -A PREROUTING -p udp -j openclash
                    fi
                 fi
@@ -922,7 +954,7 @@ EOF
                 done
                 ip route replace default dev utun table "$PROXY_ROUTE_TABLE"
              fi
-                ip rule add fwmark "$PROXY_FWMARK" table "$PROXY_ROUTE_TABLE"
+                ip rule add fwmark "$PROXY_FWMARK" table "$PROXY_ROUTE_TABLE" pref 789
              #设置防火墙
                 iptables -t mangle -N openclash
                 iptables -t mangle -F openclash
@@ -936,9 +968,9 @@ EOF
                 iptables -t mangle -I PREROUTING -m set ! --match-set localnetwork dst -j MARK --set-mark "$PROXY_FWMARK"
                 iptables -t nat -I PREROUTING -p tcp --dport 53 -j ACCEPT
              #ipv6
-                #if [ "$ipv6_enable" -eq 1 ]; then
-                   #ip6tables -t mangle -I PREROUTING -j MARK --set-mark "$PROXY_FWMARK"
-                #fi
+             #    if [ "$ipv6_enable" -eq 1 ]; then
+             #        ip6tables -t mangle -I PREROUTING -j MARK --set-mark "$PROXY_FWMARK"
+             #    fi
              fi
 
              echo "第九步: 重启 Dnsmasq 程序..." >$START_LOG
@@ -946,8 +978,9 @@ EOF
              fake_block "$en_mode" "$direct_dns"
              /etc/init.d/dnsmasq restart >/dev/null 2>&1
              if pidof clash >/dev/null; then
-                echo "第十步: 添加 OpenClash 计划任务,启动进程守护程序..." >$START_LOG
+                echo "第十步: 还原策略组节点状态..." >$START_LOG
                 /usr/share/openclash/openclash_history_set.sh
+                echo "第十一步: 添加计划任务,启动进程守护程序..." >$START_LOG
                 add_cron
                 if [ -z "$(uci get dhcp.lan.dhcpv6 2>/dev/null)" ]; then
                    echo "OpenClash 启动成功，请等待服务器上线！" >$START_LOG
@@ -962,9 +995,9 @@ EOF
                 echo "" >$START_LOG
              else
                 if [ "$rule_source" != 0 ] || [ "$enable_custom_clash_rules" != 0 ]; then
-                   echo "错误: OpenClash 启动失败，尝试还原规则并重新启动 Clash 主程序..." >$START_LOG
+                   echo "错误: OpenClash 启动失败，尝试还原第三方规则并重新启动 Clash 主程序..." >$START_LOG
                    echo "${LOGTIME} OpenClash Can Not Start, Try Use Backup Rules Start Again" >> $LOG_FILE
-                   mv "$BACKUP_FILE" /etc/openclash/configrules.bak
+                   mv "$START_BACKUP" /etc/openclash/configrules.bak
                    sed -i -n '/^Rule:/,$p' /etc/openclash/configrules.bak
                    sed -i '/^Rule:/,$d' "$CONFIG_FILE"
                    cat /etc/openclash/configrules.bak >> "$CONFIG_FILE"
@@ -1041,8 +1074,8 @@ stop()
     
 #ipv4
 
-    ip rule del fwmark 1 table 100 >/dev/null 2>&1
-    ip route del local default dev lo table 100 >/dev/null 2>&1
+    ip rule del fwmark "$PROXY_FWMARK" table "$PROXY_ROUTE_TABLE" pref 789 >/dev/null 2>&1
+    ip route del local default dev lo table "$PROXY_ROUTE_TABLE" >/dev/null 2>&1
     
     iptables -t nat -D PREROUTING -p tcp --dport 53 -j ACCEPT >/dev/null 2>&1
 
@@ -1086,7 +1119,7 @@ stop()
     ip tuntap del clash0 mode tun >/dev/null 2>&1
     ip route del default dev clash0 table "$PROXY_ROUTE_TABLE" >/dev/null 2>&1
     ip route del default dev utun table "$PROXY_ROUTE_TABLE" >/dev/null 2>&1
-    ip rule del fwmark "$PROXY_FWMARK" table "$PROXY_ROUTE_TABLE" >/dev/null 2>&1
+    ip rule del fwmark "$PROXY_FWMARK" table "$PROXY_ROUTE_TABLE" pref 789 >/dev/null 2>&1
 
     iptables -t mangle -D OUTPUT -j openclash >/dev/null 2>&1
     iptables -t mangle -D PREROUTING -m set --match-set lan_ac_black_ips src -j RETURN >/dev/null 2>&1
@@ -1126,7 +1159,7 @@ stop()
        sleep 5
     fi
     
-    rm -rf $START_LOG
+    rm -rf $START_LOG 2>/dev/null
     del_cron
     echo "OpenClash Already Stop"
 }
