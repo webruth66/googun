@@ -8,3 +8,5 @@ sudo apt-get install golang-go build-essential asciidoc binutils bzip2 gawk gett
 2.   make menuconfig   
 
 3.   make -j1 V=s
+
+http://192.168.56.2/
