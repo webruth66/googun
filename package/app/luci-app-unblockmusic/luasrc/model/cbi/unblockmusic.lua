@@ -1,7 +1,7 @@
 local fs = require "nixio.fs"
 
 mp = Map("unblockmusic", translate("解锁网易云灰色歌曲"))
-mp.description = translate("采用 [QQ/虾米/百度/酷狗/酷我/咕咪/JOOX]等音源，替换网易云变灰歌曲链接")
+mp.description = translate("原理：采用 [QQ/虾米/百度/酷狗/酷我/咕咪/JOOX]等音源 替换网易云变灰歌曲链接<br />具体使用方法可查看github：<br />https://github.com/maxlicheng/luci-app-unblockmusic")
 
 mp:section(SimpleSection).template  = "unblockmusic/unblockmusic_status"
 
@@ -9,7 +9,7 @@ s = mp:section(TypedSection, "unblockmusic")
 s.anonymous=true
 s.addremove=false
 
-enabled = s:option(Flag, "enabled", translate("启用"))
+enabled = s:option(Flag, "enabled", translate("启用解锁"))
 enabled.default = 0
 enabled.rmempty = false
 enabled.description = translate("启用后，路由器自动分流解锁，大部分设备无需设置代理")
@@ -64,7 +64,7 @@ o.inputtitle = translate("更新核心版本")
 o.description = string.format(translate("NodeJS 解锁主程序版本") ..  "<strong><font color=\"green\">: %s </font></strong>", ver)
 o.inputstyle = "reload"
 o.write = function()
-	luci.sys.exec("/usr/share/UnblockNeteaseMusic/update_core.sh luci_update 2>&1")
+        luci.sys.exec("/usr/share/UnblockNeteaseMusic/update_core.sh luci_update 2>&1")
   luci.http.redirect(luci.dispatcher.build_url("admin", "services", "unblockmusic"))
 end
 o:depends("apptype", "nodejs")
@@ -81,9 +81,9 @@ e.width="40%"
 e.datatype="ip4addr"
 e.placeholder="0.0.0.0/0"
 luci.ip.neighbors({ family = 4 }, function(entry)
-	if entry.reachable then
-		e:value(entry.dest:string())
-	end
+        if entry.reachable then
+                e:value(entry.dest:string())
+        end
 end)
 
 e=t:option(ListValue,"filter_mode",translate("例外协议"))
@@ -93,5 +93,8 @@ e.rmempty=false
 e:value("disable",translate("不代理HTTP和HTTPS"))
 e:value("http",translate("不代理HTTP"))
 e:value("https",translate("不代理HTTPS"))
+
+enabled=s:option(DummyValue,"opennewwindow" ,
+        translate("<input type=\"button\" class=\"cbi-button cbi-button-apply\" value=\"使用教程\" onclick=\"window.open('https://github.com/maxlicheng/luci-app-unblockmusic')\" />"))
 
 return mp
