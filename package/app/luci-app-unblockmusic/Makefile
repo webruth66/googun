@@ -2,16 +2,13 @@
 #
 # This is free software, licensed under the Apache License, Version 2.0 .
 #
-# licheng
-# www.maxlicheng.com
-# 2019-06-08
 #
 
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-app-unblockmusic
-PKG_VERSION:=2.3.1
-PKG_RELEASE:=41
+PKG_VERSION:=2.3.5
+PKG_RELEASE:=9
 
 PKG_CONFIG_DEPENDS := \
 	CONFIG_UnblockNeteaseMusic_Go \
@@ -29,7 +26,7 @@ LUCI_TITLE:=LuCI support for Unblock NeteaseCloudMusic
 LUCI_DEPENDS:=+dnsmasq-full +ipset +wget +UnblockNeteaseMusic_NodeJS:UnblockNeteaseMusic +UnblockNeteaseMusic_Go:UnblockNeteaseMusicGo
 LUCI_PKGARCH:=all
 
-PKG_MAINTAINER:=<https://github.com/maxlicheng/luci-app-unblockmusic>
+PKG_MAINTAINER:=lean
 
 include $(TOPDIR)/feeds/luci/luci.mk
 
